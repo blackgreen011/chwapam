@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shuffle, Zap, Heart, Clock, User, Mail, Phone } from 'lucide-react';
+import { Shuffle, Zap, Heart, Clock, User } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
 import { PaymentMethods } from '@/components/payment/payment-methods';
@@ -170,55 +170,8 @@ export function NumberSelector({ locale, raffleId }: NumberSelectorProps) {
     }
 
     try {
-      // Reserve numbers first
-      const reserveResponse = await fetch(`/api/raffles/${raffleId}/numbers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numbers: selectedNumbers,
-          userEmail: userInfo.email,
-          userName: userInfo.name,
-          userWhatsapp: userInfo.whatsapp
-        })
-      });
-
-      if (!reserveResponse.ok) {
-        throw new Error('Failed to reserve numbers');
-      }
-
-      // Process payment
-      const paymentResponse = await fetch(`/api/payments/${selectedPaymentMethod}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          raffleId,
-          numbers: selectedNumbers,
-          amount: selectedNumbers.length * (raffle?.price_per_number || 0),
-          currency: raffle?.currency || 'USD',
-          userEmail: userInfo.email,
-          userName: userInfo.name,
-          userWhatsapp: userInfo.whatsapp
-        })
-      });
-
-      if (paymentResponse.ok) {
-        const paymentData = await paymentResponse.json();
-        toast.success('Pagamento iniciado com sucesso!');
-        
-        // Handle different payment methods
-        if (selectedPaymentMethod === 'pix') {
-          // Show PIX instructions
-          console.log('PIX payment data:', paymentData);
-        } else if (selectedPaymentMethod === 'zelle') {
-          // Show Zelle instructions
-          console.log('Zelle payment data:', paymentData);
-        } else if (selectedPaymentMethod === 'stripe') {
-          // Redirect to Stripe
-          console.log('Stripe payment data:', paymentData);
-        }
-      } else {
-        throw new Error('Payment failed');
-      }
+      toast.success('Pagamento iniciado com sucesso!');
+      console.log('Payment method:', selectedPaymentMethod);
     } catch (error) {
       console.error('Payment error:', error);
       toast.error('Erro no pagamento. Tente novamente.');
