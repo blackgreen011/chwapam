@@ -1,19 +1,12 @@
 "use client";
 
 import { use } from 'react';
-import { Inter } from 'next/font/google';
 import { useRouter, usePathname } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { type Locale } from '@/lib/i18n';
 import { Toaster } from '@/components/ui/sonner';
 import '../globals.css';
-
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap'
-});
 
 export default function LocaleLayout({
   children,
@@ -35,7 +28,7 @@ export default function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <div className="min-h-screen flex flex-col">
           <Header locale={locale} onLocaleChange={handleLocaleChange} />
           <main className="flex-1">

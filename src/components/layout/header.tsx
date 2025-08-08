@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/ui/language-selector';
-import { Menu, X, Crown, User, ShoppingBag, Sparkles } from 'lucide-react';
+import { Menu, X, Crown, User, ShoppingBag, Sparkles, LogOut, Settings } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
+import { toast } from 'sonner';
 
 interface HeaderProps {
   locale: Locale;
@@ -16,7 +17,16 @@ interface HeaderProps {
 
 export function Header({ locale, onLocaleChange }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
 
   const navigation = [
     { name: t(locale, 'nav.home'), href: `/${locale}` },
@@ -27,6 +37,13 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
   ];
 
   const isActive = (href: string) => pathname === href;
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    toast.success('Logout realizado com sucesso!');
+    router.push(`/${locale}`);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -68,15 +85,46 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
               onLocaleChange={onLocaleChange} 
             />
             
-            <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-slate-100">
-              <User className="h-4 w-4 mr-2" />
-              {t(locale, 'nav.login')}
-            </Button>
+            {user ? (
+              <div className="flex items-center space-x-2">
+                <span className="hidden sm:inline text-sm text-slate-600">
+                  Olá, {user.name}
+                </span>
+                
+                {user.role === 'admin' && (
+                  <Link href={`/${locale}/admin`}>
+                    <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-slate-100">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
+                
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="hidden sm:flex hover:bg-slate-100"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              </div>
+            ) : (
+              <Link href={`/${locale}/login`}>
+                <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-slate-100">
+                  <User className="h-4 w-4 mr-2" />
+                  {t(locale, 'nav.login')}
+                </Button>
+              </Link>
+            )}
 
-            <Button size="sm" className="hidden sm:flex bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all">
-              <ShoppingBag className="h-4 w-4 mr-2" />
-              {t(locale, 'nav.raffles')}
-            </Button>
+            <Link href={`/${locale}/raffles`}>
+              <Button size="sm" className="hidden sm:flex bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all">
+                <ShoppingBag className="h-4 w-4 mr-2" />
+                {t(locale, 'nav.raffles')}
+              </Button>
+            </Link>
 
             {/* Mobile Menu Button */}
             <Button
@@ -109,14 +157,43 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
                 </Link>
               ))}
               <div className="flex flex-col space-y-2 pt-4 border-t">
-                <Button variant="ghost" size="sm" className="justify-start">
-                  <User className="h-4 w-4 mr-2" />
-                  {t(locale, 'nav.login')}
-                </Button>
-                <Button size="sm" className="justify-start bg-gradient-to-r from-yellow-500 to-orange-500">
-                  <ShoppingBag className="h-4 w-4 mr-2" />
-                  {t(locale, 'nav.raffles')}
-                </Button>
+                {user ? (
+                  <>
+                    <div className="px-2 py-1 text-sm text-slate-600">
+                      Olá, {user.name}
+                    </div>
+                    {user.role === 'admin' && (
+                      <Link href={`/${locale}/admin`}>
+                        <Button variant="ghost" size="sm" className="justify-start">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Admin
+                        </Button>
+                      </Link>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleLogout}
+                      className="justify-start"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sair
+                    </Button>
+                  </>
+                ) : (
+                  <Link href={`/${locale}/login`}>
+                    <Button variant="ghost" size="sm" className="justify-start">
+                      <User className="h-4 w-4 mr-2" />
+                      {t(locale, 'nav.login')}
+                    </Button>
+                  </Link>
+                )}
+                <Link href={`/${locale}/raffles`}>
+                  <Button size="sm" className="justify-start bg-gradient-to-r from-yellow-500 to-orange-500">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    {t(locale, 'nav.raffles')}
+                  </Button>
+                </Link>
               </div>
             </nav>
           </div>

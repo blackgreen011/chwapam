@@ -1,11 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "CHANS PAW - Sorteios Premium",
@@ -19,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt">
-      <body className={`${inter.variable} antialiased`}>
+      <body className="font-sans antialiased">
         {children}
       </body>
     </html>
