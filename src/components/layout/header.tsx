@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { LanguageSelector } from '@/components/ui/language-selector';
 import { Menu, X, Crown, User, ShoppingBag, Sparkles, LogOut, Settings } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
-import { toast } from 'sonner';
+import { useAuth } from '@/components/auth/auth-provider';
 
 interface HeaderProps {
   locale: Locale;
@@ -17,16 +17,9 @@ interface HeaderProps {
 
 export function Header({ locale, onLocaleChange }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { user, profile, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-  }, []);
 
   const navigation = [
     { name: t(locale, 'nav.home'), href: `/${locale}` },
@@ -38,11 +31,13 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
 
   const isActive = (href: string) => pathname === href;
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    toast.success('Logout realizado com sucesso!');
-    router.push(`/${locale}`);
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push(`/${locale}`);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -85,13 +80,13 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
               onLocaleChange={onLocaleChange} 
             />
             
-            {user ? (
+            {user && profile ? (
               <div className="flex items-center space-x-2">
                 <span className="hidden sm:inline text-sm text-slate-600">
-                  Olá, {user.name}
+                  Olá, {profile.name}
                 </span>
                 
-                {user.role === 'admin' && (
+                {(profile.role === 'admin' || profile.role === 'moderator') && (
                   <Link href={`/${locale}/admin`}>
                     <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-slate-100">
                       <Settings className="h-4 w-4 mr-2" />
@@ -157,12 +152,12 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
                 </Link>
               ))}
               <div className="flex flex-col space-y-2 pt-4 border-t">
-                {user ? (
+                {user && profile ? (
                   <>
                     <div className="px-2 py-1 text-sm text-slate-600">
-                      Olá, {user.name}
+                      Olá, {profile.name}
                     </div>
-                    {user.role === 'admin' && (
+                    {(profile.role === 'admin' || profile.role === 'moderator') && (
                       <Link href={`/${locale}/admin`}>
                         <Button variant="ghost" size="sm" className="justify-start">
                           <Settings className="h-4 w-4 mr-2" />

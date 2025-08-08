@@ -4,6 +4,7 @@ import { use } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { AuthProvider } from '@/components/auth/auth-provider';
 import { type Locale } from '@/lib/i18n';
 import { Toaster } from '@/components/ui/sonner';
 import '../globals.css';
@@ -29,14 +30,16 @@ export default function LocaleLayout({
   return (
     <html lang={locale}>
       <body className="font-sans antialiased">
-        <div className="min-h-screen flex flex-col">
-          <Header locale={locale} onLocaleChange={handleLocaleChange} />
-          <main className="flex-1">
-            {children}
-          </main>
-          <Footer locale={locale} />
-        </div>
-        <Toaster />
+        <AuthProvider>
+          <div className="min-h-screen flex flex-col">
+            <Header locale={locale} onLocaleChange={handleLocaleChange} />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer locale={locale} />
+          </div>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

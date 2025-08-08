@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Crown, Mail, Lock, User, Phone } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
+import { useAuth } from '@/components/auth/auth-provider';
 import { toast } from 'sonner';
 
 interface LoginPageProps {
@@ -17,8 +18,9 @@ interface LoginPageProps {
 export default function LoginPage({ params }: LoginPageProps) {
   const { locale } = use(params);
   const router = useRouter();
+  const { signIn, signUp, loading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -29,56 +31,37 @@ export default function LoginPage({ params }: LoginPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setFormLoading(true);
 
     try {
       if (isLogin) {
-        // Login logic
-        if (formData.email === 'admin@chanspaw.com' && formData.password === 'admin123') {
-          localStorage.setItem('user', JSON.stringify({
-            id: '1',
-            email: formData.email,
-            name: 'Administrador',
-            role: 'admin'
-          }));
-          toast.success('Login realizado com sucesso!');
-          router.push(`/${locale}/admin`);
-        } else {
-          // Regular user login
-          localStorage.setItem('user', JSON.stringify({
-            id: '2',
-            email: formData.email,
-            name: formData.name || 'Usuário',
-            role: 'user'
-          }));
-          toast.success('Login realizado com sucesso!');
-          router.push(`/${locale}`);
-        }
+        await signIn(formData.email, formData.password);
+        router.push(`/${locale}`);
       } else {
-        // Register logic
-        if (!formData.name || !formData.email || !formData.password) {
-          toast.error('Preencha todos os campos obrigatórios');
+        if (!formData.name) {
+          toast.error('Nome é obrigatório');
           return;
         }
-        
-        localStorage.setItem('user', JSON.stringify({
-          id: Date.now().toString(),
-          email: formData.email,
-          name: formData.name,
-          whatsapp: formData.whatsapp,
-          role: 'user'
-        }));
-        
-        toast.success('Cadastro realizado com sucesso!');
-        router.push(`/${locale}`);
+        await signUp(formData.email, formData.password, formData.name, formData.whatsapp);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth error:', error);
-      toast.error('Erro na autenticação. Tente novamente.');
+      toast.error(error.message || 'Erro na autenticação');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p>Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -122,6 +105,7 @@ export default function LoginPage({ params }: LoginPageProps) {
             
             <div>
               <Label htmlFor="email">E-mail *</Label>
+              
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -172,9 +156,9 @@ export default function LoginPage({ params }: LoginPageProps) {
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-              disabled={loading}
+              disabled={formLoading}
             >
-              {loading ? 'Processando...' : (isLogin ? 'Entrar' : 'Criar Conta')}
+              {formLoading ? 'Processando...' : (isLogin ? 'Entrar' : 'Criar Conta')}
             </Button>
           </form>
           
