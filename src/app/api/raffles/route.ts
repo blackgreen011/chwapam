@@ -25,16 +25,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const raffleData = {
-      ...body,
-      created_by: user.id,
-    };
+    // Remove created_by field if it exists since the column doesn't exist
+    const { created_by, ...raffleData } = body;
     
     const { data: raffle, error } = await supabase
       .from('raffles')

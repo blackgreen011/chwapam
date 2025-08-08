@@ -91,34 +91,34 @@ export default function AdminPage({ params }: AdminPageProps) {
   const createSampleRaffle = async () => {
     try {
       const sampleRaffle = {
-        title: 'AirPods Pro 3ª Geração',
-        description: 'AirPods Pro de 3ª geração com cancelamento ativo de ruído, áudio espacial e estojo de carregamento MagSafe.',
-        images: ['https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500'],
+        title: 'Nintendo Switch OLED',
+        description: 'Nintendo Switch OLED com tela de 7 polegadas, cores vibrantes e áudio aprimorado. Inclui dock e Joy-Con.',
+        images: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=500'],
         specifications: {
-          'Modelo': 'AirPods Pro 3ª Geração',
-          'Cancelamento de Ruído': 'Ativo',
-          'Bateria': 'Até 6h + 24h com estojo',
-          'Conectividade': 'Bluetooth 5.3',
+          'Modelo': 'Nintendo Switch OLED',
+          'Tela': '7 polegadas OLED',
+          'Armazenamento': '64GB',
+          'Controles': 'Joy-Con inclusos',
           'Estado': 'Novo lacrado',
-          'Garantia': '1 ano Apple'
+          'Garantia': '1 ano Nintendo'
         },
-        market_value: 1899,
-        price_per_number: 10,
-        total_numbers: 300,
-        draw_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        market_value: 2299,
+        price_per_number: 12,
+        total_numbers: 400,
+        draw_date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'active',
         translations: {
           pt: {
-            title: 'AirPods Pro 3ª Geração',
-            description: 'AirPods Pro de 3ª geração com cancelamento ativo de ruído.'
+            title: 'Nintendo Switch OLED',
+            description: 'Nintendo Switch OLED com tela de 7 polegadas, cores vibrantes e áudio aprimorado.'
           },
           en: {
-            title: 'AirPods Pro 3rd Generation',
-            description: 'AirPods Pro 3rd generation with active noise cancellation.'
+            title: 'Nintendo Switch OLED',
+            description: 'Nintendo Switch OLED with 7-inch screen, vibrant colors and enhanced audio.'
           }
         },
         featured: false,
-        category: 'electronics'
+        category: 'gaming'
       };
 
       const { data, error } = await supabase
@@ -252,7 +252,7 @@ export default function AdminPage({ params }: AdminPageProps) {
                 onClick={createSampleRaffle}
                 className="w-full bg-gradient-to-r from-yellow-500 to-orange-500"
               >
-                Criar AirPods Pro
+                Criar Nintendo Switch
               </Button>
             </CardContent>
           </Card>

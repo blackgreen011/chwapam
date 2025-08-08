@@ -37,10 +37,9 @@ export interface Raffle {
   status: 'draft' | 'active' | 'paused' | 'ended' | 'drawn';
   winner_number?: number;
   winner_user_id?: string;
-  created_by: string;
   translations: Record<string, any>;
-  featured: boolean;
-  category: string;
+  featured?: boolean;
+  category?: string;
   created_at: string;
   updated_at: string;
   soldNumbers?: number;
@@ -122,10 +121,7 @@ export const isModerator = async () => {
 export const getRaffles = async (status?: string, limit = 10, offset = 0) => {
   let query = supabase
     .from('raffles')
-    .select(`
-      *,
-      raffle_numbers!inner(count)
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -140,27 +136,44 @@ export const getRaffles = async (status?: string, limit = 10, offset = 0) => {
     return [];
   }
 
-  return data?.map(raffle => ({
-    ...raffle,
-    soldNumbers: raffle.raffle_numbers?.[0]?.count || 0
-  })) || [];
+  // Get sold numbers count for each raffle
+  const rafflesWithSoldNumbers = await Promise.all(
+    (data || []).map(async (raffle) => {
+      const { data: soldData } = await supabase
+        .from('raffle_numbers')
+        .select('id')
+        .eq('raffle_id', raffle.id)
+        .eq('payment_status', 'paid');
+      
+      return {
+        ...raffle,
+        soldNumbers: soldData?.length || 0
+      };
+    })
+  );
+
+  return rafflesWithSoldNumbers;
 };
 
 export const getRaffleById = async (id: string) => {
   const { data, error } = await supabase
     .from('raffles')
-    .select(`
-      *,
-      raffle_numbers!inner(count)
-    `)
+    .select('*')
     .eq('id', id)
     .single();
 
   if (error) throw error;
 
+  // Get sold numbers count
+  const { data: soldData } = await supabase
+    .from('raffle_numbers')
+    .select('id')
+    .eq('raffle_id', id)
+    .eq('payment_status', 'paid');
+
   return {
     ...data,
-    soldNumbers: data.raffle_numbers?.[0]?.count || 0
+    soldNumbers: soldData?.length || 0
   };
 };
 
@@ -277,26 +290,4 @@ export const getSetting = async (key: string) => {
     return null;
   }
   return data?.value;
-};
-
-// Create admin user if doesn't exist
-export const createAdminUser = async () => {
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email: 'admin@chanspaw.com',
-      password: 'admin123',
-      options: {
-        data: {
-          name: 'Administrador',
-          role: 'admin'
-        }
-      }
-    });
-    
-    if (error && !error.message.includes('already registered')) {
-      console.error('Error creating admin:', error);
-    }
-  } catch (error) {
-    console.error('Error creating admin:', error);
-  }
 };
