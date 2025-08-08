@@ -34,8 +34,8 @@ export default function LocaleLayout({
   };
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
+    <html lang={locale}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         <div className="min-h-screen flex flex-col">
           <Header locale={locale} onLocaleChange={handleLocaleChange} />
           <main className="flex-1">

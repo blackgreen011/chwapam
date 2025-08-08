@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,18 +13,8 @@ export async function POST(request: NextRequest) {
       userWhatsapp 
     } = await request.json();
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency: currency.toLowerCase(),
-      metadata: {
-        raffleId,
-        numbers: JSON.stringify(numbers),
-        userEmail,
-        userName,
-        userWhatsapp,
-      },
-    });
+    // Simulate Stripe payment intent creation
+    const paymentIntentId = `pi_${Math.random().toString(36).substring(7)}`;
 
     // Create payment record
     const { data: payment, error } = await supabase
@@ -41,7 +26,7 @@ export async function POST(request: NextRequest) {
         currency,
         payment_method: 'stripe',
         payment_status: 'pending',
-        payment_intent_id: paymentIntent.id,
+        payment_intent_id: paymentIntentId,
         numbers,
       }])
       .select()
@@ -53,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      clientSecret: paymentIntent.client_secret,
+      clientSecret: `${paymentIntentId}_secret_test`,
       paymentId: payment.id,
     });
   } catch (error) {
