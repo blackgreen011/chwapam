@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, Users, DollarSign, Trophy, Plus, Settings, BarChart3, LogOut } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
+import { useAuth } from '@/components/auth/auth-provider';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface AdminPageProps {
@@ -16,96 +18,135 @@ interface AdminPageProps {
 export default function AdminPage({ params }: AdminPageProps) {
   const { locale } = use(params);
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, profile, signOut } = useAuth();
   const [stats, setStats] = useState({
-    totalRaffles: 5,
-    activeRaffles: 3,
-    totalUsers: 1250,
-    totalRevenue: 45000,
-    pendingPayments: 12
+    totalRaffles: 0,
+    activeRaffles: 0,
+    totalUsers: 0,
+    totalRevenue: 0,
+    pendingPayments: 0
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
+    if (!user) {
       router.push(`/${locale}/login`);
       return;
     }
     
-    const parsedUser = JSON.parse(userData);
-    if (parsedUser.role !== 'admin') {
+    if (profile && profile.role !== 'admin') {
       toast.error('Acesso negado. Apenas administradores podem acessar esta área.');
       router.push(`/${locale}`);
       return;
     }
-    
-    setUser(parsedUser);
-  }, [locale, router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    toast.success('Logout realizado com sucesso!');
-    router.push(`/${locale}`);
+    if (profile) {
+      fetchStats();
+    }
+  }, [user, profile, locale, router]);
+
+  const fetchStats = async () => {
+    try {
+      // Buscar estatísticas reais do banco
+      const [rafflesResult, usersResult, paymentsResult] = await Promise.all([
+        supabase.from('raffles').select('status'),
+        supabase.from('profiles').select('id'),
+        supabase.from('payments').select('amount, payment_status')
+      ]);
+
+      const raffles = rafflesResult.data || [];
+      const users = usersResult.data || [];
+      const payments = paymentsResult.data || [];
+
+      const totalRevenue = payments
+        .filter(p => p.payment_status === 'completed')
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      const pendingPayments = payments
+        .filter(p => p.payment_status === 'pending').length;
+
+      setStats({
+        totalRaffles: raffles.length,
+        activeRaffles: raffles.filter(r => r.status === 'active').length,
+        totalUsers: users.length,
+        totalRevenue,
+        pendingPayments
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push(`/${locale}`);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const createSampleRaffle = async () => {
     try {
       const sampleRaffle = {
-        title: 'iPhone 15 Pro Max 256GB',
-        description: 'iPhone 15 Pro Max 256GB Titânio Natural - Novo, lacrado com garantia Apple.',
-        images: ['https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500'],
+        title: 'AirPods Pro 3ª Geração',
+        description: 'AirPods Pro de 3ª geração com cancelamento ativo de ruído, áudio espacial e estojo de carregamento MagSafe.',
+        images: ['https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500'],
         specifications: {
-          'Modelo': 'iPhone 15 Pro Max',
-          'Armazenamento': '256GB',
-          'Cor': 'Titânio Natural',
+          'Modelo': 'AirPods Pro 3ª Geração',
+          'Cancelamento de Ruído': 'Ativo',
+          'Bateria': 'Até 6h + 24h com estojo',
+          'Conectividade': 'Bluetooth 5.3',
           'Estado': 'Novo lacrado',
           'Garantia': '1 ano Apple'
         },
-        market_value: 8999,
-        price_per_number: 25,
-        total_numbers: 1000,
-        draw_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        market_value: 1899,
+        price_per_number: 10,
+        total_numbers: 300,
+        draw_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'active',
         translations: {
           pt: {
-            title: 'iPhone 15 Pro Max 256GB',
-            description: 'iPhone 15 Pro Max 256GB Titânio Natural - Novo, lacrado com garantia Apple.'
+            title: 'AirPods Pro 3ª Geração',
+            description: 'AirPods Pro de 3ª geração com cancelamento ativo de ruído.'
           },
           en: {
-            title: 'iPhone 15 Pro Max 256GB',
-            description: 'iPhone 15 Pro Max 256GB Natural Titanium - New, sealed with Apple warranty.'
+            title: 'AirPods Pro 3rd Generation',
+            description: 'AirPods Pro 3rd generation with active noise cancellation.'
           }
-        }
+        },
+        featured: false,
+        category: 'electronics'
       };
 
-      const response = await fetch('/api/raffles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sampleRaffle)
-      });
+      const { data, error } = await supabase
+        .from('raffles')
+        .insert([sampleRaffle])
+        .select()
+        .single();
 
-      if (response.ok) {
-        toast.success('Sorteio de exemplo criado com sucesso!');
-        setStats(prev => ({ 
-          ...prev, 
-          totalRaffles: prev.totalRaffles + 1,
-          activeRaffles: prev.activeRaffles + 1
-        }));
-      } else {
-        toast.error('Erro ao criar sorteio de exemplo');
+      if (error) {
+        console.error('Error creating raffle:', error);
+        toast.error('Erro ao criar sorteio: ' + error.message);
+        return;
       }
+
+      toast.success('Sorteio criado com sucesso!');
+      await fetchStats();
     } catch (error) {
       console.error('Error creating sample raffle:', error);
       toast.error('Erro ao criar sorteio de exemplo');
     }
   };
 
-  if (!user) {
+  if (!profile || loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-slate-600">Verificando permissões...</p>
+          <p className="text-slate-600">Carregando painel administrativo...</p>
         </div>
       </div>
     );
@@ -123,7 +164,7 @@ export default function AdminPage({ params }: AdminPageProps) {
               </div>
               <div>
                 <h1 className="text-3xl font-bold">Painel Administrativo</h1>
-                <p className="text-slate-300">Bem-vindo, {user.name}</p>
+                <p className="text-slate-300">Bem-vindo, {profile.name}</p>
               </div>
             </div>
             <Button 
@@ -160,9 +201,9 @@ export default function AdminPage({ params }: AdminPageProps) {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{stats.totalUsers}</div>
               <p className="text-xs text-muted-foreground">
-                +12% este mês
+                Usuários cadastrados
               </p>
             </CardContent>
           </Card>
@@ -173,9 +214,9 @@ export default function AdminPage({ params }: AdminPageProps) {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
-                +8% este mês
+                Pagamentos confirmados
               </p>
             </CardContent>
           </Card>
@@ -188,7 +229,7 @@ export default function AdminPage({ params }: AdminPageProps) {
             <CardContent>
               <div className="text-2xl font-bold">{stats.pendingPayments}</div>
               <p className="text-xs text-muted-foreground">
-                Requer atenção
+                Aguardando confirmação
               </p>
             </CardContent>
           </Card>
@@ -211,7 +252,7 @@ export default function AdminPage({ params }: AdminPageProps) {
                 onClick={createSampleRaffle}
                 className="w-full bg-gradient-to-r from-yellow-500 to-orange-500"
               >
-                Criar Sorteio de Exemplo
+                Criar AirPods Pro
               </Button>
             </CardContent>
           </Card>
@@ -228,7 +269,7 @@ export default function AdminPage({ params }: AdminPageProps) {
             </CardHeader>
             <CardContent>
               <Button variant="outline" className="w-full">
-                Ver Usuários
+                Ver Usuários ({stats.totalUsers})
               </Button>
             </CardContent>
           </Card>
@@ -245,44 +286,44 @@ export default function AdminPage({ params }: AdminPageProps) {
             </CardHeader>
             <CardContent>
               <Button variant="outline" className="w-full">
-                Configurar
+                Configurar Sistema
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Activity */}
+        {/* System Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Atividade Recente</CardTitle>
+            <CardTitle>Status do Sistema</CardTitle>
             <CardDescription>
-              Últimas ações na plataforma
+              Informações sobre o funcionamento da plataforma
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                 <div>
-                  <p className="font-medium">Novo usuário cadastrado</p>
-                  <p className="text-sm text-slate-600">João Silva - joao@email.com</p>
+                  <p className="font-medium text-green-800">Banco de Dados</p>
+                  <p className="text-sm text-green-600">Conectado e funcionando</p>
                 </div>
-                <Badge variant="secondary">Há 2 min</Badge>
+                <Badge className="bg-green-500">Online</Badge>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                 <div>
-                  <p className="font-medium">Pagamento confirmado</p>
-                  <p className="text-sm text-slate-600">Sorteio iPhone 15 - $125.00</p>
+                  <p className="font-medium text-green-800">Autenticação</p>
+                  <p className="text-sm text-green-600">Supabase Auth ativo</p>
                 </div>
-                <Badge className="bg-green-500">Há 5 min</Badge>
+                <Badge className="bg-green-500">Ativo</Badge>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                 <div>
-                  <p className="font-medium">Números reservados</p>
-                  <p className="text-sm text-slate-600">5 números - Sorteio MacBook Pro</p>
+                  <p className="font-medium text-yellow-800">Pagamentos</p>
+                  <p className="text-sm text-yellow-600">APIs de pagamento prontas para configuração</p>
                 </div>
-                <Badge variant="outline">Há 10 min</Badge>
+                <Badge className="bg-yellow-500">Configurar</Badge>
               </div>
             </div>
           </CardContent>

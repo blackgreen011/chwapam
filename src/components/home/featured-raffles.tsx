@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Clock, Users, DollarSign } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
-import { type Raffle } from '@/lib/supabase';
+import { supabase, type Raffle } from '@/lib/supabase';
 
 interface FeaturedRafflesProps {
   locale: Locale;
@@ -24,9 +24,27 @@ export function FeaturedRaffles({ locale }: FeaturedRafflesProps) {
 
   const fetchFeaturedRaffles = async () => {
     try {
-      const response = await fetch('/api/raffles?status=active&limit=3');
-      const data = await response.json();
-      setRaffles(data.raffles || []);
+      const { data, error } = await supabase
+        .from('raffles')
+        .select(`
+          *,
+          raffle_numbers!inner(count)
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error fetching raffles:', error);
+        return;
+      }
+
+      const rafflesWithSoldNumbers = data?.map(raffle => ({
+        ...raffle,
+        soldNumbers: raffle.raffle_numbers?.[0]?.count || 0
+      })) || [];
+
+      setRaffles(rafflesWithSoldNumbers);
     } catch (error) {
       console.error('Error fetching raffles:', error);
     } finally {
@@ -41,6 +59,21 @@ export function FeaturedRaffles({ locale }: FeaturedRafflesProps) {
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">Sorteios em Destaque</h2>
             <p className="text-xl text-slate-600">Carregando...</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="h-64 bg-slate-200" />
+                <CardContent className="p-6">
+                  <div className="h-6 bg-slate-200 rounded mb-2" />
+                  <div className="h-4 bg-slate-200 rounded mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded" />
+                    <div className="h-4 bg-slate-200 rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>

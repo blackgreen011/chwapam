@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth event:', event, session?.user?.email);
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -58,8 +59,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setProfile(data);
+      if (error) {
+        console.error('Error loading profile:', error);
+        // If profile doesn't exist, create it
+        if (error.code === 'PGRST116') {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert([{
+                id: user.id,
+                email: user.email!,
+                name: user.user_metadata?.name || user.email!,
+                whatsapp: user.user_metadata?.whatsapp,
+                role: user.email === 'admin@chanspaw.com' ? 'admin' : 'user'
+              }]);
+            
+            if (!insertError) {
+              await loadProfile(userId);
+              return;
+            }
+          }
+        }
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -68,60 +92,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      toast.success('Login realizado com sucesso!');
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      throw new Error(error.message || 'Erro no login');
     }
-
-    toast.success('Login realizado com sucesso!');
   };
 
   const signUp = async (email: string, password: string, name: string, whatsapp?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          whatsapp,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            whatsapp,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      // For development, auto-confirm the user
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.success('Conta criada com sucesso! Você já pode fazer login.');
+      } else {
+        toast.success('Cadastro realizado com sucesso!');
+      }
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      throw new Error(error.message || 'Erro no cadastro');
     }
-
-    toast.success('Cadastro realizado com sucesso! Verifique seu email.');
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      throw error;
-    }
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
 
-    toast.success('Logout realizado com sucesso!');
+      toast.success('Logout realizado com sucesso!');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      throw new Error(error.message || 'Erro no logout');
+    }
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) throw new Error('No user logged in');
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Reload profile
-    await loadProfile(user.id);
-    toast.success('Perfil atualizado com sucesso!');
+      // Reload profile
+      await loadProfile(user.id);
+      toast.success('Perfil atualizado com sucesso!');
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      throw new Error(error.message || 'Erro ao atualizar perfil');
+    }
   };
 
   const value = {

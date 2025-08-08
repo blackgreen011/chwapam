@@ -1,13 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ataeueqpwdzghunwnvxa.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YWV1ZXFwd2R6Z2h1bndudnhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NjQxNzgsImV4cCI6MjA3MDI0MDE3OH0.-oT0enfAxiUR-3uN2tfBKE7bPYAcPRN1lESrHElNxZU';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   }
 });
 
@@ -123,18 +124,21 @@ export const getRaffles = async (status?: string, limit = 10, offset = 0) => {
     .from('raffles')
     .select(`
       *,
-      raffle_numbers(count)
+      raffle_numbers!inner(count)
     `)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (status) {
+  if (status && status !== 'all') {
     query = query.eq('status', status);
   }
 
   const { data, error } = await query;
   
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching raffles:', error);
+    return [];
+  }
 
   return data?.map(raffle => ({
     ...raffle,
@@ -147,7 +151,7 @@ export const getRaffleById = async (id: string) => {
     .from('raffles')
     .select(`
       *,
-      raffle_numbers(count)
+      raffle_numbers!inner(count)
     `)
     .eq('id', id)
     .single();
@@ -166,7 +170,10 @@ export const getRaffleNumbers = async (raffleId: string) => {
     .select('number, payment_status, reserved_until')
     .eq('raffle_id', raffleId);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching raffle numbers:', error);
+    return { soldNumbers: [], reservedNumbers: [], totalSold: 0 };
+  }
 
   const soldNumbers = data
     ?.filter(n => n.payment_status === 'paid')
@@ -251,7 +258,10 @@ export const getSettings = async (category?: string) => {
   }
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching settings:', error);
+    return [];
+  }
   return data || [];
 };
 
@@ -262,6 +272,31 @@ export const getSetting = async (key: string) => {
     .eq('key', key)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching setting:', error);
+    return null;
+  }
   return data?.value;
+};
+
+// Create admin user if doesn't exist
+export const createAdminUser = async () => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: 'admin@chanspaw.com',
+      password: 'admin123',
+      options: {
+        data: {
+          name: 'Administrador',
+          role: 'admin'
+        }
+      }
+    });
+    
+    if (error && !error.message.includes('already registered')) {
+      console.error('Error creating admin:', error);
+    }
+  } catch (error) {
+    console.error('Error creating admin:', error);
+  }
 };
