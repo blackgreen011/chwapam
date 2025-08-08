@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/ui/language-selector';
-import { Menu, X, Crown, User, ShoppingBag } from 'lucide-react';
+import { Menu, X, Crown, User, ShoppingBag, Sparkles } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
 
@@ -15,6 +16,7 @@ interface HeaderProps {
 
 export function Header({ locale, onLocaleChange }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   const navigation = [
     { name: t(locale, 'nav.home'), href: `/${locale}` },
@@ -24,17 +26,20 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
     { name: t(locale, 'nav.contact'), href: `/${locale}/contact` },
   ];
 
+  const isActive = (href: string) => pathname === href;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href={`/${locale}`} className="flex items-center space-x-2">
+          <Link href={`/${locale}`} className="flex items-center space-x-2 group">
             <div className="relative">
-              <Crown className="h-8 w-8 text-yellow-500" />
+              <Crown className="h-8 w-8 text-yellow-500 group-hover:text-yellow-600 transition-colors" />
               <div className="absolute -top-1 -right-1 h-3 w-3 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-pulse" />
+              <Sparkles className="absolute -bottom-1 -left-1 h-3 w-3 text-yellow-400 animate-pulse delay-500" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent group-hover:from-yellow-600 group-hover:to-orange-600 transition-all">
               CHANS PAW
             </span>
           </Link>
@@ -45,7 +50,11 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-sm font-medium transition-colors hover:text-primary"
+                className={`text-sm font-medium transition-colors hover:text-yellow-600 ${
+                  isActive(item.href) 
+                    ? 'text-yellow-600 font-semibold' 
+                    : 'text-slate-600'
+                }`}
               >
                 {item.name}
               </Link>
@@ -59,12 +68,12 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
               onLocaleChange={onLocaleChange} 
             />
             
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
+            <Button variant="ghost" size="sm" className="hidden sm:flex hover:bg-slate-100">
               <User className="h-4 w-4 mr-2" />
               {t(locale, 'nav.login')}
             </Button>
 
-            <Button size="sm" className="hidden sm:flex bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600">
+            <Button size="sm" className="hidden sm:flex bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all">
               <ShoppingBag className="h-4 w-4 mr-2" />
               {t(locale, 'nav.raffles')}
             </Button>
@@ -83,13 +92,17 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden border-t py-4">
+          <div className="md:hidden border-t py-4 animate-in slide-in-from-top-2 duration-200">
             <nav className="flex flex-col space-y-4">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-sm font-medium transition-colors hover:text-primary px-2 py-1"
+                  className={`text-sm font-medium transition-colors hover:text-yellow-600 px-2 py-1 rounded ${
+                    isActive(item.href) 
+                      ? 'text-yellow-600 bg-yellow-50 font-semibold' 
+                      : 'text-slate-600'
+                  }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {item.name}
