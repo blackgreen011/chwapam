@@ -60,6 +60,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   swcMinify: true,
+  
+  // Experimental features
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
 };
 
 export default nextConfig;
