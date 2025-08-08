@@ -21,11 +21,12 @@ export interface Raffle {
   winner_user_id?: string;
   created_at: string;
   updated_at: string;
-  translations: Record<string, {
+  translations?: Record<string, {
     title: string;
     description: string;
-    specifications: Record<string, any>;
+    specifications?: Record<string, any>;
   }>;
+  soldNumbers?: number;
 }
 
 export interface RaffleNumber {
@@ -37,7 +38,7 @@ export interface RaffleNumber {
   user_name?: string;
   user_whatsapp?: string;
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: 'stripe' | 'pix' | 'zelle';
+  payment_method?: 'stripe' | 'pix' | 'zelle';
   payment_id?: string;
   reserved_until?: string;
   created_at: string;
@@ -50,6 +51,7 @@ export interface User {
   whatsapp?: string;
   role: 'user' | 'admin';
   created_at: string;
+  updated_at: string;
 }
 
 export interface Payment {
@@ -63,6 +65,7 @@ export interface Payment {
   payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
   payment_intent_id?: string;
   numbers: number[];
+  metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }

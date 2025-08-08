@@ -4,35 +4,54 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shuffle, Zap, Heart, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Shuffle, Zap, Heart, Clock, User, Mail, Phone } from 'lucide-react';
 import { type Locale } from '@/lib/i18n';
 import { t } from '@/lib/translations';
+import { PaymentMethods } from '@/components/payment/payment-methods';
+import { toast } from 'sonner';
 
 interface NumberSelectorProps {
   locale: Locale;
-  totalNumbers: number;
-  soldNumbers: number[];
-  pricePerNumber: number;
-  currency: string;
-  onSelectionChange: (numbers: number[]) => void;
+  raffleId: string;
 }
 
-export function NumberSelector({ 
-  locale, 
-  totalNumbers, 
-  soldNumbers, 
-  pricePerNumber, 
-  currency,
-  onSelectionChange 
-}: NumberSelectorProps) {
-  const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
-  const [reservedNumbers, setReservedNumbers] = useState<number[]>([]);
-  const [timeLeft, setTimeLeft] = useState<number>(0);
+interface RaffleData {
+  id: string;
+  title: string;
+  price_per_number: number;
+  total_numbers: number;
+  currency?: string;
+}
 
-  // Simulate reservation timer
+export function NumberSelector({ locale, raffleId }: NumberSelectorProps) {
+  const [raffle, setRaffle] = useState<RaffleData | null>(null);
+  const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
+  const [soldNumbers, setSoldNumbers] = useState<number[]>([]);
+  const [reservedNumbers, setReservedNumbers] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<'select' | 'info' | 'payment'>('select');
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  
+  // User info
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    whatsapp: ''
+  });
+
+  // Payment
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+
+  useEffect(() => {
+    fetchRaffleData();
+    fetchNumbers();
+  }, [raffleId]);
+
   useEffect(() => {
     if (selectedNumbers.length > 0 && timeLeft === 0) {
-      setTimeLeft(15 * 60); // 15 minutes in seconds
+      setTimeLeft(15 * 60); // 15 minutes
     }
   }, [selectedNumbers.length]);
 
@@ -41,9 +60,8 @@ export function NumberSelector({
       const timer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            // Time expired, clear selection
             setSelectedNumbers([]);
-            setReservedNumbers([]);
+            setStep('select');
             return 0;
           }
           return prev - 1;
@@ -53,9 +71,38 @@ export function NumberSelector({
     }
   }, [timeLeft]);
 
-  useEffect(() => {
-    onSelectionChange(selectedNumbers);
-  }, [selectedNumbers, onSelectionChange]);
+  const fetchRaffleData = async () => {
+    try {
+      const response = await fetch(`/api/raffles/${raffleId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRaffle({
+          id: data.raffle.id,
+          title: data.raffle.title,
+          price_per_number: data.raffle.price_per_number,
+          total_numbers: data.raffle.total_numbers,
+          currency: 'USD'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching raffle:', error);
+    }
+  };
+
+  const fetchNumbers = async () => {
+    try {
+      const response = await fetch(`/api/raffles/${raffleId}/numbers`);
+      if (response.ok) {
+        const data = await response.json();
+        setSoldNumbers(data.soldNumbers || []);
+        setReservedNumbers(data.reservedNumbers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching numbers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -80,7 +127,9 @@ export function NumberSelector({
   };
 
   const selectRandomNumbers = (count: number) => {
-    const availableNumbers = Array.from({ length: totalNumbers }, (_, i) => i + 1)
+    if (!raffle) return;
+    
+    const availableNumbers = Array.from({ length: raffle.total_numbers }, (_, i) => i + 1)
       .filter(n => !isNumberSold(n) && !isNumberReserved(n) && !isNumberSelected(n));
     
     const randomNumbers = [];
@@ -95,9 +144,89 @@ export function NumberSelector({
   const clearSelection = () => {
     setSelectedNumbers([]);
     setTimeLeft(0);
+    setStep('select');
+  };
+
+  const proceedToInfo = () => {
+    if (selectedNumbers.length === 0) {
+      toast.error('Selecione pelo menos um número');
+      return;
+    }
+    setStep('info');
+  };
+
+  const proceedToPayment = () => {
+    if (!userInfo.name || !userInfo.email) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    setStep('payment');
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPaymentMethod) {
+      toast.error('Selecione um método de pagamento');
+      return;
+    }
+
+    try {
+      // Reserve numbers first
+      const reserveResponse = await fetch(`/api/raffles/${raffleId}/numbers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numbers: selectedNumbers,
+          userEmail: userInfo.email,
+          userName: userInfo.name,
+          userWhatsapp: userInfo.whatsapp
+        })
+      });
+
+      if (!reserveResponse.ok) {
+        throw new Error('Failed to reserve numbers');
+      }
+
+      // Process payment
+      const paymentResponse = await fetch(`/api/payments/${selectedPaymentMethod}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          raffleId,
+          numbers: selectedNumbers,
+          amount: selectedNumbers.length * (raffle?.price_per_number || 0),
+          currency: raffle?.currency || 'USD',
+          userEmail: userInfo.email,
+          userName: userInfo.name,
+          userWhatsapp: userInfo.whatsapp
+        })
+      });
+
+      if (paymentResponse.ok) {
+        const paymentData = await paymentResponse.json();
+        toast.success('Pagamento iniciado com sucesso!');
+        
+        // Handle different payment methods
+        if (selectedPaymentMethod === 'pix') {
+          // Show PIX instructions
+          console.log('PIX payment data:', paymentData);
+        } else if (selectedPaymentMethod === 'zelle') {
+          // Show Zelle instructions
+          console.log('Zelle payment data:', paymentData);
+        } else if (selectedPaymentMethod === 'stripe') {
+          // Redirect to Stripe
+          console.log('Stripe payment data:', paymentData);
+        }
+      } else {
+        throw new Error('Payment failed');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('Erro no pagamento. Tente novamente.');
+    }
   };
 
   const formatCurrency = (amount: number) => {
+    const currency = raffle?.currency || 'USD';
     const symbols = { USD: '$', EUR: '€', BRL: 'R$', HTG: 'G' };
     return `${symbols[currency as keyof typeof symbols] || '$'}${amount.toFixed(2)}`;
   };
@@ -124,6 +253,112 @@ export function NumberSelector({
     }
   };
 
+  if (loading || !raffle) {
+    return (
+      <Card className="animate-pulse">
+        <CardContent className="p-6">
+          <div className="h-6 bg-slate-200 rounded mb-4" />
+          <div className="h-32 bg-slate-200 rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (step === 'info') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <User className="h-5 w-5" />
+            <span>{t(locale, 'checkout.personalInfo')}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="name">{t(locale, 'checkout.name')} *</Label>
+            <Input
+              id="name"
+              value={userInfo.name}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Seu nome completo"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="email">{t(locale, 'checkout.email')} *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={userInfo.email}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="seu@email.com"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="whatsapp">{t(locale, 'checkout.whatsapp')}</Label>
+            <Input
+              id="whatsapp"
+              value={userInfo.whatsapp}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, whatsapp: e.target.value }))}
+              placeholder="+55 11 99999-9999"
+            />
+          </div>
+
+          <div className="bg-yellow-50 p-4 rounded-lg">
+            <p className="text-sm text-slate-600 mb-2">
+              <strong>Números selecionados:</strong> {selectedNumbers.length}
+            </p>
+            <p className="text-lg font-bold text-green-600">
+              Total: {formatCurrency(selectedNumbers.length * raffle.price_per_number)}
+            </p>
+          </div>
+
+          <div className="flex space-x-3">
+            <Button variant="outline" onClick={() => setStep('select')}>
+              Voltar
+            </Button>
+            <Button onClick={proceedToPayment} className="flex-1">
+              Continuar para Pagamento
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (step === 'payment') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t(locale, 'checkout.paymentMethod')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PaymentMethods
+            locale={locale}
+            selectedMethod={selectedPaymentMethod}
+            onMethodSelect={setSelectedPaymentMethod}
+            amount={selectedNumbers.length * raffle.price_per_number}
+            currency={raffle.currency || 'USD'}
+          />
+          
+          <div className="flex space-x-3 mt-6">
+            <Button variant="outline" onClick={() => setStep('info')}>
+              Voltar
+            </Button>
+            <Button 
+              onClick={handlePayment}
+              className="flex-1 bg-gradient-to-r from-green-500 to-green-600"
+              disabled={!selectedPaymentMethod}
+            >
+              Finalizar Pagamento
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Quick Actions */}
@@ -142,7 +377,7 @@ export function NumberSelector({
               className="flex items-center space-x-2"
             >
               <Shuffle className="h-4 w-4" />
-              <span>1 número</span>
+              <span>1</span>
             </Button>
             <Button 
               variant="outline" 
@@ -150,7 +385,7 @@ export function NumberSelector({
               className="flex items-center space-x-2"
             >
               <Shuffle className="h-4 w-4" />
-              <span>5 números</span>
+              <span>5</span>
             </Button>
             <Button 
               variant="outline" 
@@ -158,7 +393,7 @@ export function NumberSelector({
               className="flex items-center space-x-2"
             >
               <Shuffle className="h-4 w-4" />
-              <span>10 números</span>
+              <span>10</span>
             </Button>
             <Button 
               variant="outline" 
@@ -166,7 +401,7 @@ export function NumberSelector({
               className="flex items-center space-x-2"
             >
               <Heart className="h-4 w-4" />
-              <span>20 números</span>
+              <span>20</span>
             </Button>
           </div>
         </CardContent>
@@ -182,7 +417,7 @@ export function NumberSelector({
                   {selectedNumbers.length} {t(locale, 'product.numbersSelected')}
                 </p>
                 <p className="text-2xl font-bold text-green-600">
-                  {t(locale, 'product.total')}: {formatCurrency(selectedNumbers.length * pricePerNumber)}
+                  {t(locale, 'product.total')}: {formatCurrency(selectedNumbers.length * raffle.price_per_number)}
                 </p>
               </div>
               {timeLeft > 0 && (
@@ -210,10 +445,11 @@ export function NumberSelector({
                 variant="outline"
                 size="sm"
               >
-                Limpar Seleção
+                Limpar
               </Button>
               <Button 
-                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                onClick={proceedToInfo}
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 flex-1"
                 size="sm"
               >
                 {t(locale, 'product.proceedToCheckout')}
@@ -244,7 +480,7 @@ export function NumberSelector({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-8 md:grid-cols-12 lg:grid-cols-16 gap-2 max-h-96 overflow-y-auto">
-            {Array.from({ length: totalNumbers }, (_, i) => i + 1).map(number => {
+            {Array.from({ length: raffle.total_numbers }, (_, i) => i + 1).map(number => {
               const status = getNumberStatus(number);
               return (
                 <div
